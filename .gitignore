@@ -2,6 +2,9 @@
 .credentials.json
 mcp-needs-auth-cache.json
 
+# Local per-machine settings
+settings.local.json
+
 # Session history and transcripts
 history.jsonl
 projects/
