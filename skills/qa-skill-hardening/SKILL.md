@@ -21,6 +21,7 @@ Target: `$ARGUMENTS` (if empty, auto-discover all skills in the project)
 3. **Regression-Resistant**: Fixed bugs stay fixed. Never commit a state where a previously passing test drops to FAIL
 4. **Autonomous Persistence**: Continue the hardening loop until every skill is PASS or definitively BLOCKED
 5. **Safe State Mutation**: dry-run -> isolated fixture -> test sandbox -> live execution
+6. **Parallel-Agent Safe**: When multiple agents are hardening different skills simultaneously, each agent owns exactly one skill's files. Shared write targets (SKILL_HARDENING_MASTER.md, REGRESSION_TESTS.md, FINAL_SKILL_HARDENING_REPORT.md, SKILLS_INDEX.md) are coordinator-owned — no agent writes to them during a parallel run unless explicitly designated as the coordinator agent.
 
 ---
 
@@ -101,6 +102,45 @@ For every discovered skill/script, determine:
 ### Step 0.5 — Build the Source Material
 
 Synthesize all discovery into a structured inventory. Record it in `docs/skill_memory/SKILL_HARDENING_MASTER.md`.
+
+---
+
+## PARALLEL EXECUTION MODE
+
+If `$ARGUMENTS` contains `parallel=true` or multiple `target=` values, activate Parallel Execution Mode.
+
+### Rules for Parallel Mode
+
+1. **One skill per agent.** Each agent receives exactly one `target=<skill-name>`. Never assign two skills to one agent in parallel mode.
+
+2. **Shared file lock list.** The following files are COORDINATOR-OWNED — individual agents must NOT write to them during Phases 1–7:
+   - `docs/skill_memory/SKILL_HARDENING_MASTER.md`
+   - `docs/skill_memory/REGRESSION_TESTS.md`
+   - `docs/skill_memory/FINAL_SKILL_HARDENING_REPORT.md`
+   - `docs/skills/SKILLS_INDEX.md`
+   - `docs/skills/global_skills.md`
+
+   Each agent writes ONLY to its own `docs/skill_memory/<skill-name>_MEMORY.md` and its own `docs/skills/how_to/<skill-name>.md`.
+
+3. **Skip Phase 7 SKILLS_INDEX update.** In parallel mode, each agent skips the SKILLS_INDEX.md write in Phase 7 and instead logs:
+   `"SKILLS_INDEX update deferred — parallel mode. Coordinator will merge."`
+
+4. **Coordinator merge step.** After all parallel agents report 9/9 PASS, a single designated coordinator agent (or the user manually) runs:
+   `/qa-skill-hardening merge=true`
+   which reads all per-skill MEMORY.md files and writes the shared files once in a single non-conflicting pass.
+
+5. **Invoke pattern for parallel mode:**
+
+```text
+# Terminal 1
+/qa-skill-hardening target=etl-pipeline parallel=true
+# Terminal 2
+/qa-skill-hardening target=arcgis-pro parallel=true
+# Terminal 3
+/qa-skill-hardening target=data-validation parallel=true
+# After all complete — any single terminal
+/qa-skill-hardening merge=true
+```
 
 ---
 
@@ -384,3 +424,23 @@ PHASE 7: Documentation Sync (passing skills only — aggregated guide, SKILLS_IN
 ```
 
 **Begin PHASE 0 now. Do not wait for user input unless a true hard blocker prevents all forward progress.**
+
+## MERGE MODE (`merge=true`)
+
+Runs only when all parallel agents have completed. Coordinator reads all per-skill MEMORY.md files and writes the shared files once.
+
+### Steps
+
+1. Read all `docs/skill_memory/*_MEMORY.md` files produced this session
+2. Merge results into `SKILL_HARDENING_MASTER.md` (append rows, no overwrites of existing content)
+3. Merge regression tests into `REGRESSION_TESTS.md` (append only)
+4. Regenerate `FINAL_SKILL_HARDENING_REPORT.md` with combined totals from all per-skill memory files
+5. Update `SKILLS_INDEX.md` — one row per skill, in a single write
+6. Update `docs/skills/global_skills.md` — one pass, append missing entries only
+7. Commit all shared files in one commit with message:
+`qa-skill-hardening: merge parallel results — [skill1, skill2, skill3]`
+8. Report: table showing each skill's final score and merge status
+
+### Merge Guard
+
+If merge=true is invoked but any per-skill MEMORY.md files are missing or show non-PASS status, print a warning listing the incomplete skills and ask the user to confirm before proceeding with a partial merge.
