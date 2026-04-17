@@ -25,6 +25,17 @@ debug/
 *-cache.json
 stats-cache.json
 
+# Large / machine-local trees not needed for skill sync
+backups/
+chrome/
+ide/
+plans/
+plugins/
+scripts/
+tasks/
+.claude.code-workspace
+policy-limits.json
+
 # OS
 .DS_Store
 Thumbs.db
