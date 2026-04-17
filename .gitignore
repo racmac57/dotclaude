@@ -1,0 +1,27 @@
+# Claude Code auth and credentials
+.credentials.json
+mcp-needs-auth-cache.json
+
+# Session history and transcripts
+history.jsonl
+projects/
+sessions/
+todos/
+
+# File diffs and clipboard
+file-history/
+paste-cache/
+
+# Shell environment captures
+shell-snapshots/
+
+# Telemetry and cache
+cache/
+statsig/
+debug/
+*-cache.json
+stats-cache.json
+
+# OS
+.DS_Store
+Thumbs.db
