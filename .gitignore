@@ -32,6 +32,9 @@ ide/
 plans/
 plugins/
 scripts/
+# Exception: Scripts/ (capital S) is the intentional deploy-source for
+# Mirror-ToPersonalOneDrive.ps1 and future cross-machine scripts.
+!Scripts/
 tasks/
 .claude.code-workspace
 policy-limits.json

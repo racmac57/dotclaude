@@ -54,3 +54,48 @@ if ($hash_src -eq $hash_dest) {
 } else {
     Write-Host "WARNING: Hash mismatch! Copy may have failed." -ForegroundColor Red
 }
+
+# ---------------------------------------------------------------------------
+# Deploy Mirror-ToPersonalOneDrive.ps1 to $env:USERPROFILE\Scripts\
+# Portable across machines — the script itself uses $env:USERPROFILE and
+# $env:COMPUTERNAME, so a single copy works on both desktop (carucci_r) and
+# laptop (RobertCarucci). Skipped silently if repo doesn't carry the file.
+# ---------------------------------------------------------------------------
+$mirrorSrc = Join-Path $repoRoot "Scripts\Mirror-ToPersonalOneDrive.ps1"
+$mirrorDst = Join-Path $env:USERPROFILE "Scripts\Mirror-ToPersonalOneDrive.ps1"
+
+Write-Host ""
+Write-Host "Mirror script deploy" -ForegroundColor Cyan
+Write-Host "Source : $mirrorSrc"
+Write-Host "Dest   : $mirrorDst"
+
+if (Test-Path $mirrorSrc) {
+    $mirrorDir = Split-Path $mirrorDst
+    if (-not (Test-Path $mirrorDir)) {
+        New-Item -ItemType Directory -Path $mirrorDir -Force | Out-Null
+        Write-Host "Created $mirrorDir" -ForegroundColor Yellow
+    }
+
+    if (Test-Path $mirrorDst) {
+        Copy-Item $mirrorDst "$mirrorDst.bak" -Force
+        Write-Host "Backed up existing Mirror-ToPersonalOneDrive.ps1 -> .bak" -ForegroundColor Yellow
+    }
+
+    Copy-Item $mirrorSrc $mirrorDst -Force
+    Write-Host "Deployed Mirror-ToPersonalOneDrive.ps1 [OK]" -ForegroundColor Green
+
+    $hash_ms = (Get-FileHash $mirrorSrc).Hash
+    $hash_md = (Get-FileHash $mirrorDst).Hash
+    if ($hash_ms -eq $hash_md) {
+        Write-Host "Hash verified [OK]" -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: Mirror script hash mismatch!" -ForegroundColor Red
+    }
+
+    Write-Host ""
+    Write-Host "If the MirrorToPersonalOneDrive task is running the old script, restart it:" -ForegroundColor Yellow
+    Write-Host "  schtasks /End /TN MirrorToPersonalOneDrive" -ForegroundColor Yellow
+    Write-Host "  schtasks /Run /TN MirrorToPersonalOneDrive" -ForegroundColor Yellow
+} else {
+    Write-Host "Mirror script not in repo at $mirrorSrc -- skipped" -ForegroundColor DarkGray
+}
