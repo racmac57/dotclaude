@@ -13,6 +13,7 @@ This tracker records the most recent 9-step binary-test result per skill. It is 
 | Skill | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | Score | Status | Last Hardened |
 |-------|----|----|----|----|----|----|----|----|----|-------|--------|---------------|
 | session-handoff | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS | 2026-04-19 |
+| chunk-chat | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS | 2026-04-19 |
 
 Other global skills (qa-skill-hardening, etl-pipeline, arcgis-pro, etc.) were hardened in previous runs whose memory files live in their owning project trees (Workbook_Redesign_2026, cad_rms_data_quality, etc.). This file tracks only skills hardened against the `.claude` repo itself.
 
@@ -23,8 +24,9 @@ Other global skills (qa-skill-hardening, etl-pipeline, arcgis-pro, etc.) were ha
 | Skill | Reads | Writes | Depends On |
 |-------|-------|--------|------------|
 | session-handoff | conversation transcript only | _nothing_ | none |
+| chunk-chat | in-memory transcript (stdin) OR user-supplied file path | `KB_Shared\04_output\{timestamp}_{name}\` (4 artifacts) | `scripts\chat_chunker.py` (stdlib-only) |
 
-`session-handoff` has no file-level dependencies and no shared write targets. It is safe to run in any project and alongside any other skill.
+`chunk-chat` writes only to timestamp-keyed folders under `KB_Shared\04_output`; no shared write targets with any other skill. The Cursor-permission-prompt refactor removed all filesystem writes for the transcript itself — the chunker now reads it from stdin.
 
 ---
 

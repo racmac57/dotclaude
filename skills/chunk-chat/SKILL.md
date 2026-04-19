@@ -34,27 +34,22 @@ Check `$ARGUMENTS`:
 
 ### Step 2 - Capture the conversation
 
-Reconstruct the full conversation from your context window. First resolve
-the real system temp directory by running:
+Reconstruct the full conversation from your context window as an
+**in-memory string**. Do NOT write it to a temp file — the chunker reads
+the transcript from stdin so no filesystem writes are required here.
 
-```bash
-python -c "import tempfile; print(tempfile.gettempdir())"
-```
+Derive a meaningful basename using the AI Suffix Naming Convention (see
+section below). If `$ARGUMENTS` contains a topic label, use it. Otherwise
+generate a 4–8 word Title_Case topic that describes this conversation,
+then append `_Claude`.
 
-Next, derive a meaningful filename using the AI Suffix Naming Convention
-(see section below). If `$ARGUMENTS` contains a topic label, use it.
-Otherwise generate a 4–8 word Title_Case topic that describes this
-conversation, then append `_Claude`.
+Example basename: `Chunk_Chat_Skill_Update_And_Hardening_Claude`
 
-Name the temp file: `<temp_dir>/<Topic_Description>_Claude.txt`
+This basename is passed to the chunker via `--name=` in Step 3 — it
+becomes the folder/file stem that previously came from the temp
+filename.
 
-Example: `C:\Users\carucci_r\AppData\Local\Temp\Chunk_Chat_Skill_Update_And_Hardening_Claude.txt`
-
-**Do NOT use `/tmp` directly** — on Windows with Git Bash, `/tmp` is a
-virtual path that does not exist on the real filesystem. Always use the
-path returned by Python's `tempfile.gettempdir()`.
-
-Write the conversation to that file. Format rules:
+Format rules for the transcript string:
 - Every turn on its own line block prefixed with the role:
   ```
   [User]: <message content>
@@ -64,7 +59,7 @@ Write the conversation to that file. Format rules:
 - Preserve code blocks, error messages, and technical content **verbatim**.
 - Include tool calls/results as `[Tool: <name>]: <summary of result>`.
 - If context has been compressed and you cannot reproduce earlier turns
-  faithfully, note that at the top of the file with:
+  faithfully, prepend this note to the string:
   ```
   [Note]: Earlier portions of this conversation were summarized due to context
   limits. Content below the line is verbatim.
@@ -74,21 +69,72 @@ Write the conversation to that file. Format rules:
 
 ### Step 3 - Run the chunker
 
-Execute the standalone chunker script. It has zero external dependencies
-(stdlib only).
+Invoke the standalone chunker script. It has zero external dependencies
+(stdlib only). The invocation branches on whether Step 1 produced a
+file path or Step 2 produced an in-memory transcript:
 
-```bash
-python "C:\Users\carucci_r\.claude\scripts\chat_chunker.py" "<input_file>"
+- **File-path branch** (Step 1 supplied `file_path`): pass the path
+  directly as the first positional argument — the script opens it from
+  disk.
+- **Stdin branch** (Step 2 produced `transcript_text` + `basename`):
+  pass `-` as the input and `--name=<basename>` to set the output
+  folder/file stem, then feed the transcript in via `stdin`.
+
+Use Python's `subprocess` module to avoid shell quoting and encoding
+issues on Windows:
+
+```python
+import subprocess
+
+if file_path:
+    # File path supplied via $ARGUMENTS — pass it directly to the chunker
+    args = [
+        "python",
+        r"C:\Users\carucci_r\.claude\scripts\chat_chunker.py",
+        file_path,
+    ]
+    run_kwargs = {}
+else:
+    # In-memory transcript from Step 2 — pipe via stdin
+    args = [
+        "python",
+        r"C:\Users\carucci_r\.claude\scripts\chat_chunker.py",
+        "-",
+        f"--name={basename}",
+    ]
+    run_kwargs = {"input": transcript_text}
+
+result = subprocess.run(
+    args,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    **run_kwargs,
+)
+
+if result.returncode != 0:
+    raise RuntimeError(f"Chunker failed (exit {result.returncode}):\n{result.stderr.strip()}")
 ```
+
+- `-` tells the script to read the transcript from stdin instead of
+  opening a file.
+- `--name=<basename>` supplies the folder/file stem the script would
+  normally derive from the input path. Without it, the output folder
+  falls back to `{timestamp}_stdin`.
+- To override the default output directory, insert it as an additional
+  positional argument after the input argument (file path or `-`):
+  ```python
+  ["python", r"C:\...\chat_chunker.py", "-", r"D:\custom\out", f"--name={basename}"]
+  ```
+- Non-zero exit codes raise `RuntimeError` with `result.stderr` attached
+  so the underlying chunker failure is surfaced instead of being
+  swallowed by a silent empty-stdout parse.
 
 > **Windows note:** Use `python` not `python3` — Windows does not register
 > a `python3` command by default. Use the full path to `chat_chunker.py`
 > to avoid shell path resolution issues with `$HOME`.
 
-The script defaults to `KB_Shared/04_output` on OneDrive. To override,
-pass an explicit output directory as the second argument.
-
-Parse the JSON output from stdout.
+Parse the JSON from `result.stdout`.
 
 ### Step 4 - Report results
 
@@ -105,11 +151,6 @@ Chunked: {source_name}
   Sidecar: {sidecar filename}
 ```
 
-### Step 5 - Clean up
-
-If a temp file was created in Step 2, remove it from the system temp
-directory where it was written.
-
 ## Notes
 
 - The chunker uses sentence-boundary splitting at ~800 chars with 50-char
@@ -118,9 +159,14 @@ directory where it was written.
   inline with no external API calls.
 - Default output lands in `KB_Shared/04_output` on OneDrive. Pass an
   explicit output directory as the second argument to override.
-- If $ARGUMENTS contains `--chunk-size=N` or `--overlap=N`, edit the
-  script invocation to pass those values (the script reads them from argv
-  or can be patched at runtime via env vars in a future version).
+- If `$ARGUMENTS` contains `--chunk-size=N` or `--overlap=N`, append the
+  matching flags to the `args` list before calling `subprocess.run`:
+  ```python
+  if chunk_size:
+      args.append(f"--chunk-size={chunk_size}")
+  if overlap:
+      args.append(f"--overlap={overlap}")
+  ```
 - **ChromaDB ingestion:** Output chunks land in `KB_Shared\04_output` but
   are **not automatically ingested into ChromaDB**. The watcher only
   monitors `02_data\` for triggers. To add the chunks to the knowledge

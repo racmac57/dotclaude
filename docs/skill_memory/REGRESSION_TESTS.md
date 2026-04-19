@@ -58,3 +58,67 @@ The text `One item only. No sub-bullets, no secondary suggestions.` must remain 
 ### R7 — CRITICAL CONTEXT category-form rule
 
 The valid-category list must remain: `Data source, Dependency, Constraint, Version, Dead end, Deadline.` Edits that replace with freeform prose are a regression of T8 compliance.
+
+---
+
+## chunk-chat
+
+**Last verified:** 2026-04-19 — all PASS (post-fix for stdin-mode `UnboundLocalError`).
+
+### R1 — Stdin mode: no `src` reference after the branch split
+
+The `process()` function in `chat_chunker.py` binds a local `src = Path(input_path)` only inside the file-path branch. After the branch, all remaining code must reference the branch-neutral variables `src_name`, `src_stem`, `src_display`, `src_size` — never `src.*` directly.
+
+Violation check:
+```bash
+grep -n "\\bsrc\\." C:/Users/carucci_r/.claude/scripts/chat_chunker.py
+```
+Must return only the five lines inside the `else:` branch (223–227). Any match outside that block is a regression of the 2026-04-19 fix.
+
+### R2 — Live stdin end-to-end
+
+```python
+import subprocess, os, tempfile, json
+sandbox = os.path.join(tempfile.gettempdir(), "chunk_chat_regression")
+os.makedirs(sandbox, exist_ok=True)
+r = subprocess.run(
+    [
+        "python",
+        r"C:\Users\carucci_r\.claude\scripts\chat_chunker.py",
+        "-",
+        sandbox,
+        "--name=regression_probe",
+    ],
+    input="Short transcript. Two sentences.",
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+)
+assert r.returncode == 0, r.stderr
+assert "UnboundLocalError" not in (r.stderr or "")
+data = json.loads(r.stdout)
+assert data["chunks_created"] >= 1
+```
+
+### R3 — File-path branch still works
+
+Same invocation without `-` and with a real fixture path must produce a sidecar whose `source_path` is the resolved path (not `<stdin>`) and an origin whose `file_size_bytes` matches the fixture size on disk.
+
+### R4 — SKILL.md Step 3 has both branches
+
+`SKILL.md` must contain the literal `if file_path:` and `else:` split inside the Step 3 Python block. A single-branch subprocess call would silently route file-path invocations to stdin (the bug fixed in the 2026-04-19 review pass).
+
+### R5 — Encoding on the outer subprocess.run call
+
+`encoding="utf-8"` must appear as a top-level keyword argument on the `subprocess.run` call (not buried in the stdin branch's `run_kwargs`), otherwise the file-path branch decodes stdout using the Windows system default (cp1252) and chokes on non-ASCII chunker output.
+
+### R6 — Non-zero exit is surfaced
+
+`SKILL.md` Step 3 must contain the literal check `if result.returncode != 0:` followed by a `raise RuntimeError(...)` that includes `result.stderr`. Silent empty-stdout parsing is a regression.
+
+### R7 — Forbidden-pattern guards
+
+- No `RobertCarucci` substring in `SKILL.md` or `chat_chunker.py`.
+- No `python3 chat_chunker` invocation (Windows has no `python3` on PATH).
+- No `/tmp` used as an actual path — only referenced inside the path-safety warning in earlier versions; the refactor removed it entirely.
+- Canonical `C:\Users\carucci_r\OneDrive - City of Hackensack` substring present in both files.
