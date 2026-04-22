@@ -6,7 +6,8 @@ Captured invariants that must remain true across future edits. Any future `/qa-s
 
 ## session-handoff
 
-**Last verified:** 2026-04-19 — all PASS.
+**Last verified:** 2026-04-22 — all PASS (post write-capable redesign).
+**R4 v1 retired this pass.** Replaced with R4-v2. Added R8–R12 to lock in the new Pre-flight, Persistence, Anti-inference, SESSION METADATA, and forbidden-substring invariants.
 
 ### R1 — Frontmatter contract
 
@@ -32,17 +33,23 @@ SKILL.md must contain literal strings for every empty-case fallback:
 - `If no artifacts were produced or touched this session, write a single line: 'No artifacts this session.'`
 - Trivial-conversation short-circuit in PROJECT / TASK.
 
-### R4 — Behavioral directive verbatim set
+### R4-v2 — No CLAUDE.md restatement (formerly: 7 verbatim directives)
 
-All seven behavioral directives must appear verbatim, in order, inside the Part 1 blockquote instructions:
+**R4 v1 retired 2026-04-22.** The verbatim 7-directive block was removed because it duplicated `~/CLAUDE.md` Communication Style + Mentor Approach sections, which the next session loads automatically. Restating them was noise.
 
-1. `Output-first. No preamble or summary before the main answer.`
-2. `If asked for code, give code first.`
-3. `Fix code first; add a short note only if necessary.`
-4. `No filler, no motivational language, no generic best practices.`
-5. `No theory-first responses. No pseudocode unless explicitly requested.`
-6. `Prefer complete scripts over fragments when enough context exists.`
-7. `Act as a rigorous, honest mentor. Challenge flawed assumptions. Do not default to agreement.`
+**New invariant:** SKILL.md must contain the literal `Session-specific deviations` clause inside the Part 1 blockquote instructions, plus the `none — follow CLAUDE.md defaults` nil-state, plus an explicit rule against restating CLAUDE.md defaults.
+
+Required substrings in SKILL.md:
+
+- `Session-specific deviations` (header for the bullet)
+- `Session-specific deviations: none — follow CLAUDE.md defaults.` (nil-state)
+- `Do **not** restate CLAUDE.md defaults` (anti-duplication rule)
+
+Forbidden substrings (re-introduction of any of these is a regression — they were deliberately removed):
+
+- `Output-first. No preamble or summary before the main answer.`
+- `Act as a rigorous, honest mentor. Challenge flawed assumptions. Do not default to agreement.`
+- `No filler, no motivational language, no generic best practices.`
 
 ### R5 — Structural invariants
 
@@ -58,6 +65,75 @@ The text `One item only. No sub-bullets, no secondary suggestions.` must remain 
 ### R7 — CRITICAL CONTEXT category-form rule
 
 The valid-category list must remain: `Data source, Dependency, Constraint, Version, Dead end, Deadline.` Edits that replace with freeform prose are a regression of T8 compliance.
+
+### R8 — Pre-flight section present with 3 ordered steps (added 2026-04-22)
+
+SKILL.md must contain a `## Pre-flight (run before drafting)` section with three numbered steps in this order:
+
+1. **Prior handoff in this conversation?** — scan + version bump + delta-only rule
+2. **Repo state?** — git branch / log / status capture instruction
+3. **Date resolution.** — convert relative dates to absolute ISO
+
+Required substrings:
+
+- `## Pre-flight (run before drafting)`
+- `Prior handoff in this conversation?`
+- `Cover **only the delta since the prior version**`
+- `git -C <repo-root> rev-parse --abbrev-ref HEAD`
+- `git -C <repo-root> log --oneline -5`
+- `git -C <repo-root> status --short`
+- `Date resolution.`
+
+### R9 — Persistence section present with canonical path + Save failed fallback (added 2026-04-22)
+
+SKILL.md must contain a `## Persistence` section with:
+
+- The canonical OneDrive path under `carucci_r`: `C:\Users\carucci_r\OneDrive - City of Hackensack\00_dev\handoffs\`
+- The filename pattern `YYYY_MM_DD_<short-topic>_handoff_v<N>.md`
+- A `Saved: <full path>` confirmation rule
+- A `Save failed: <reason>` fallback rule
+
+Required substrings:
+
+- `## Persistence`
+- `C:\Users\carucci_r\OneDrive - City of Hackensack\00_dev\handoffs\`
+- `YYYY_MM_DD_<short-topic>_handoff_v<N>.md`
+- `Saved: <full path>`
+- `Save failed:`
+
+### R10 — Forbidden substring guard (added 2026-04-22)
+
+The literal substring `RobertCarucci` must **never** appear in SKILL.md. Per `~/CLAUDE.md` Path Resolution rule: "Always use `carucci_r` in Windows user paths. Never use `RobertCarucci` in scripts or configs."
+
+Violation check:
+
+```bash
+grep -F "RobertCarucci" skills/session-handoff/SKILL.md
+# must produce zero output
+```
+
+This was a real bug fixed in this pass — the original Persistence section explained the junction by naming the underlying profile, which is exactly what CLAUDE.md forbids.
+
+### R11 — ARTIFACTS anti-inference guard (added 2026-04-22)
+
+ARTIFACTS section must include a leading sentence forbidding inference, mirroring the existing tech-stack rule.
+
+Required substring:
+
+- `Do **not** infer artifacts from CLAUDE.md, repo structure, or general knowledge`
+
+### R12 — SESSION METADATA defaults (added 2026-04-22)
+
+SESSION METADATA must:
+
+- Default `Generated:` to today's date (no longer `not available` as the lead suggestion)
+- Include a `Supersedes:` line for v2+ handoffs
+
+Required substrings:
+
+- `use today's date from context; write` (in the Generated: instruction)
+- `Supersedes:` (label)
+- `omit line entirely on v1` (rule)
 
 ---
 

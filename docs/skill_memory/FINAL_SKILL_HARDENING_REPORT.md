@@ -1,85 +1,96 @@
 # FINAL SKILL HARDENING REPORT
 
-**Run date:** 2026-04-19 (second pass — chunk-chat)
-**Repo:** `C:\Users\carucci_r\.claude`
-**Invocation history:**
-- Pass 1 — `/qa-skill-hardening session-handoff` (2026-04-19, earlier)
-- Pass 2 — `/qa-skill-hardening chunk-chat` (2026-04-19, this report)
+**Latest run:** 2026-04-22 — `/qa-skill-hardening session-handoff` (re-hardening after write-capable redesign)
+**Repo:** `C:\Users\RobertCarucci\dotclaude` (source-of-truth for global skills, deployed to `~\.claude\` via `Deploy-ClaudeConfig.ps1`)
 
-**Mode:** single-skill, foreground (no parallel execution)
+**Invocation history:**
+- 2026-04-19 — Pass 1 — `/qa-skill-hardening session-handoff` (read-only era)
+- 2026-04-19 — Pass 2 — `/qa-skill-hardening chunk-chat`
+- 2026-04-22 — Pass 3 — `/qa-skill-hardening session-handoff` (this report — write-capable era)
+
+**Mode:** single-skill, foreground
 
 ---
 
-## Summary (cumulative for `.claude` repo)
+## Summary (cumulative for this repo)
 
 | Metric | Value |
 |--------|-------|
-| Total Skills hardened against this repo | 2 |
+| Total Skills hardened | 2 |
 | Fully Passing (9/9) | 2 |
 | Partially Passing | 0 |
 | Blocked | 0 |
-| Total Tests Run | 18 |
-| Total PASS | 18 |
-| Total FAIL | 0 (all failures fixed in-pass) |
-| Regression Tests Added (cumulative) | 14 (session-handoff R1–R7 + chunk-chat R1–R7) |
-| In-pass iterations required (this pass) | 2 (one fix: `chat_chunker.py:269` UnboundLocalError) |
+| Total Tests Run | 27 (2 skills × 9 + 1 re-hardening pass × 9) |
+| Total PASS | 27 |
+| Total FAIL | 0 (one in-pass T3 fix; see below) |
+| Cumulative regression invariants | 19 (session-handoff R1–R3, R4-v2, R5–R12 + chunk-chat R1–R7) |
+| In-pass iterations (this run) | 1 fix (T3 forbidden substring) |
 
 ---
 
-## Per-Skill Scorecard
+## Per-Skill Scorecard (current state)
 
-| Skill | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | Score | Status |
-|-------|----|----|----|----|----|----|----|----|----|-------|--------|
-| session-handoff | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS |
-| chunk-chat | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS |
-
----
-
-## Bugs Found and Fixed (chunk-chat pass)
-
-**Bug 1 — `chat_chunker.py:269` UnboundLocalError in stdin mode.**
-
-During the Cursor-permission-prompt refactor the transcript header line `f"**Source:** {src.name}"` was missed when every other `src.*` reference was switched to the branch-neutral `src_*` variables. Because `src` is only bound in the file-path branch, every stdin-mode invocation (which is now the default skill flow) crashed with `UnboundLocalError` the moment it tried to write the transcript.
-
-**Corrective action:** swapped `{src.name}` → `{src_name}`.
-
-**Evidence:** pre-fix exit 1 with traceback; post-fix exit 0 with four artifacts (`chunk_00000.txt`, `*_transcript.md`, `*_sidecar.json`, `*.origin.json`) produced in a timestamp-keyed folder.
-
-This is the exact class of bug the hardening framework is designed to catch — a live execution test flushed out a latent defect that static review had missed.
+| Skill | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | Score | Status | Last Hardened |
+|-------|----|----|----|----|----|----|----|----|----|-------|--------|---------------|
+| session-handoff | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS | 2026-04-22 |
+| chunk-chat | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 9/9 | PASS | 2026-04-19 |
 
 ---
 
-## Shared Regressions Added
+## Bugs Found and Fixed (this pass)
 
-**session-handoff R1–R7** (previously captured):
+**Bug 1 — T3 forbidden substring `RobertCarucci` introduced by today's Persistence section.**
 
-- R1 — Frontmatter contract (exactly 3 keys).
-- R2 — Badge `#261` pinned to exactly 2 locations.
-- R3 — Nil-state clauses present for every optional field.
-- R4 — 7 behavioral directives verbatim, in order.
-- R5 — Structural invariants (H1, SESSION METADATA mandatory, word ceiling, ARTIFACTS / NEXT BEST ACTION never truncated).
-- R6 — NEXT BEST ACTION single-item enforcement.
-- R7 — CRITICAL CONTEXT category-form rule.
+The new Persistence section explained the laptop's junction relationship by naming the underlying user profile: `carucci_r is a junction to RobertCarucci`. CLAUDE.md Path Resolution rule explicitly forbids the `RobertCarucci` substring in scripts and configs.
 
-**chunk-chat R1–R7** (added this pass):
+**Corrective action:** rewrote the explanation without naming the underlying profile: `carucci_r is a junction to the real user profile; Windows resolves transparently. Always write to the carucci_r path on every host — never substitute the underlying profile name.`
 
-- R1 — Stdin mode: no `src.*` reference outside the file-path `else:` branch (protects the 2026-04-19 UnboundLocalError fix).
-- R2 — Live stdin end-to-end: exit 0, no `UnboundLocalError`, ≥1 chunk.
-- R3 — File-path branch records real `source_path` and byte-accurate `file_size_bytes`.
-- R4 — SKILL.md Step 3 has both branches (`if file_path:` / `else:`).
-- R5 — `encoding="utf-8"` on the top-level `subprocess.run` call covers both branches.
-- R6 — Non-zero exit raises `RuntimeError` with stderr attached.
-- R7 — Forbidden-pattern guards (`RobertCarucci`, `python3 chat_chunker`, `/tmp`, missing canonical OneDrive root).
+**Evidence:** pre-fix `grep -F "RobertCarucci"` returned 1 line; post-fix returns 0. Captured **R10** as a permanent forbidden-substring guard so this regresses on any future re-introduction.
 
-These invariants must hold in every future hardening pass. Any drift is a regression.
+This is exactly the class of bug the framework is designed to catch — a feature improvement (the new Persistence section) introduced a content-rule violation that static review would have missed without an explicit grep guard.
+
+---
+
+## Design changes vs. 2026-04-19 baseline
+
+The 2026-04-19 hardening pass scored session-handoff 9/9 as a **read-only, prose-only** skill. Today's edits (committed as `47f93aa`) deliberately changed the skill in five ways:
+
+1. **Pre-flight section** — prior-handoff scan, git-state capture commands, date resolution
+2. **OPENING PROMPT** — stripped 7 verbatim CLAUDE.md duplicates; replaced with "Session-specific deviations" rule
+3. **SESSION METADATA** — `Generated:` defaults to today's date; new `Supersedes:` line for v2+
+4. **ARTIFACTS** — anti-inference guard mirroring the tech-stack rule
+5. **Persistence** — save handoffs to `00_dev/handoffs/<date>_<topic>_handoff_v<N>.md` under canonical `carucci_r` OneDrive path; chat AND archive
+
+**Skill type changed** from read-only to **write-capable**. Cross-skill safety re-checked: no other global skill writes to `00_dev/handoffs/` (verified via `grep -rln "00_dev/handoffs"`). Versioned filename + scope prevent collision.
+
+The redesign retired regression test **R4 (verbatim 7-directive block)** because the directives duplicated CLAUDE.md (which the next session loads automatically). Replaced with **R4-v2** that locks in the new "session-specific deviations only" rule and forbids re-introduction of the directives.
+
+---
+
+## Cumulative Regression Invariants
+
+### session-handoff (12 invariants — current)
+- R1 — Frontmatter contract (3 keys)
+- R2 — Badge `#261` pinned to exactly 2 locations
+- R3 — Nil-state clauses present
+- **R4-v2** — No CLAUDE.md restatement; `Session-specific deviations` clause present
+- R5 — Structural invariants (H1, SESSION METADATA mandatory, word ceiling, ARTIFACTS / NEXT BEST ACTION never truncated)
+- R6 — NEXT BEST ACTION single-item
+- R7 — CRITICAL CONTEXT category-form rule
+- **R8 (new 2026-04-22)** — Pre-flight section with 3 ordered steps + git-state capture commands
+- **R9 (new 2026-04-22)** — Persistence section with canonical `carucci_r` path + filename pattern + Save failed fallback
+- **R10 (new 2026-04-22)** — Forbidden `RobertCarucci` substring guard
+- **R11 (new 2026-04-22)** — ARTIFACTS anti-inference guard
+- **R12 (new 2026-04-22)** — SESSION METADATA: Generated defaults to today + Supersedes line for v2+
+
+### chunk-chat (7 invariants — unchanged)
+- R1–R7 (see REGRESSION_TESTS.md `chunk-chat` section)
 
 ---
 
 ## Remaining Blockers
 
 None.
-
-Minor UX follow-up (not test-blocking): `chat_chunker.py` surfaces a raw Python traceback when the input file does not exist. Failure is loud (non-zero exit, clear error text) so T6 passes, but a wrapped `FileNotFoundError` handler would produce a one-line user-facing message. Logged for future polish.
 
 ---
 
@@ -92,10 +103,10 @@ See `GIT_COMMIT_LOG.md` for hashes and messages.
 ## Autonomous Swarm Completion
 
 - **Status:** YES
-- **Reason:** Both targets (`session-handoff`, `chunk-chat`) reached 9/9. Documentation synced. Local commits made. No remote push performed this pass — left to the user.
+- **Reason:** session-handoff re-hardened to 9/9 after write-capable redesign. R4 retired with explicit replacement. 5 new regression invariants added (R8–R12). Ready for Phase 7 documentation sync. No remote push performed — left to user.
 
 ---
 
 ## Out-of-scope skills (unchanged)
 
-The `.claude` repo contains ~22 global skills. `session-handoff` and `chunk-chat` have been hardened against this repo. Other global skills (`qa-skill-hardening`, `etl-pipeline`, `arcgis-pro`, `data-validation`, `html-report`, `check-paths`, `frontend-slides`, `hpd-exec-comms`, and the Workbook_Redesign_2026 family) have memory / scorecard files under their owning project repos where prior hardening passes produced them. Running `/qa-skill-hardening` from this repo with no target would re-test all of them.
+The repo contains 21 global skills. `session-handoff` and `chunk-chat` have been hardened against this repo. Other global skills (`qa-skill-hardening`, `etl-pipeline`, `arcgis-pro`, `data-validation`, `html-report`, `check-paths`, `frontend-slides`, `hpd-exec-comms`, the Workbook_Redesign_2026 family, etc.) have memory / scorecard files under their owning project repos. Running `/qa-skill-hardening` from this repo with no target would re-test all of them.

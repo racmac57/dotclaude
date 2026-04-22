@@ -2,26 +2,40 @@
 
 **Skill:** `session-handoff`
 **Scope:** GLOBAL
-**SKILL.md:** `C:\Users\carucci_r\.claude\skills\session-handoff\SKILL.md`
-**Type:** Read-only, prose-only (renders a Markdown handoff document; no filesystem writes)
-**Hardened:** 2026-04-19
-**Iterations:** 3 authoring passes (create → 8-fix patch → 3-fix patch) + 1 hardening pass
+**SKILL.md (source-of-truth):** `<repo>\skills\session-handoff\SKILL.md`
+**SKILL.md (deployed):** `C:\Users\carucci_r\.claude\skills\session-handoff\SKILL.md`
+**Type:** **Write-capable** (creates `00_dev/handoffs/<date>_<topic>_handoff_v<N>.md`) + prose-only render
+**Hardened:** 2026-04-22 (this pass) — supersedes 2026-04-19 (read-only era)
+**Iterations this pass:** 1 in-pass fix (T3 forbidden substring) + 5 design enhancements
 
 ---
 
-## 9-Step Binary Scorecard
+## What changed since 2026-04-19
+
+| Area | Prior | This pass |
+|------|-------|-----------|
+| Type | Read-only, prose-only | **Write-capable** (handoff archive) |
+| Pre-flight | None | New section: prior-handoff scan, git-state capture, date resolution |
+| OPENING PROMPT directives | 7 verbatim CLAUDE.md duplicates | "Session-specific deviations" only — no CLAUDE.md restatement |
+| SESSION METADATA | `Generated: not available` allowed | Defaults to today's date; new `Supersedes:` line for v2+ |
+| ARTIFACTS | "Touched or produced" | Anti-inference guard added (mirrors tech-stack rule) |
+| Persistence | None | Save to `00_dev/handoffs/<date>_<topic>_handoff_v<N>.md` under canonical `carucci_r` path; chat AND archive; `Save failed:` fallback |
+
+---
+
+## 9-Step Binary Scorecard (this pass)
 
 | # | Test | Score | Evidence |
 |---|------|-------|----------|
-| 1 | Exists & Loadable | **1** | PyYAML `safe_load` succeeds; 3 frontmatter keys (`name`, `description`, `agents`); single H1 `# Session handoff generator`; 142 lines total |
-| 2 | Shared Context Access | **1** | Only reads the current conversation at render time. No external file references. Identity terms (SSOCC, Hackensack PD, Principal Analyst) mirror `~/CLAUDE.md` verbatim |
-| 3 | Path Safety | **1** | Skill body contains zero filesystem paths. No `~/`, no `C:\Users\RobertCarucci`, no hardcoded user strings. Output instructions never write files |
-| 4 | Data Dictionary Compliance | **1** | Canonical domain terms used exactly: CAD, RMS, Python ETL, GIS, Power BI, NIBRS, Clery, ALPR, CompStat. Badge `#261` present in exactly 2 required locations (task header + Part 1 blockquote spec) |
-| 5 | Idempotency | **1** | Pure function of conversation transcript. No side effects, no writes, no randomness injected. Re-running on the same transcript yields the same document |
-| 6 | Error Handling | **1** | Explicit nil-state clauses for every optional field: `Active domains: none mentioned this session.`, `Tech stack: none mentioned this session.`, `No artifacts this session.`, `No rejected options this session.`, trivial-conversation short-circuit in PROJECT / TASK |
-| 7 | Output Correctness | **1** | Two-part structure mandated (OPENING PROMPT + HANDOFF BODY). Fenced code, blockquote, and horizontal-rule rules explicit. Word ceiling (900 standard / 1400 absolute) with compression priority (CRITICAL CONTEXT and STATUS first; never ARTIFACTS or NEXT BEST ACTION) |
-| 8 | CLAUDE.md Rule Compliance | **1** | Behavioral directives verbatim match `~/CLAUDE.md` Communication Style + Mentor Approach sections: output-first, no filler, no motivational language, no theory-first, mentor challenge over agreement. Audience-aware clause honors command-staff formality rule |
-| 9 | Integration / Cross-Skill Safety | **1** | No filesystem writes, no shared write targets, no race conditions. Safe to run alongside any other skill including write-capable ones. PII / credential-safety pass clause mitigates accidental leakage in output |
+| 1 | Exists & Loadable | **1** | PyYAML `safe_load` succeeds; 3 frontmatter keys (`name`, `description`, `agents`); 1 H1 `# Session handoff generator`; 170 lines |
+| 2 | Shared Context Access | **1** | References CLAUDE.md context (`Today's date is …`), canonical OneDrive root. Junction `/c/Users/carucci_r -> /c/Users/RobertCarucci` resolves on laptop (verified `ls -la`); write target `00_dev/handoffs/` parent exists on disk |
+| 3 | Path Safety | **1** | Zero `RobertCarucci` substring (post-fix). Canonical `carucci_r` path used 3× (path declaration + filename example + on-host write rule). Junction explained without naming the underlying profile |
+| 4 | Data Dictionary Compliance | **1** | Badge `#261` in exactly 2 locations (lines 9 + 54); domain terms preserved (CAD, RMS, Power BI, NIBRS, Clery, ALPR, CompStat) |
+| 5 | Idempotency | **1** | Same conversation → same `Handoff version: N` → overwrites same `_v<N>.md` filename. Pre-flight delta logic keys off in-conversation prior handoff, not on-disk state — no spurious version bumps |
+| 6 | Error Handling | **1** | All 4 nil-state clauses preserved (Active domains / Tech stack / No rejected / No artifacts). New: `Save failed: <reason>` fallback when write fails — never silently drops archival copy |
+| 7 | Output Correctness | **1** | Two-part structure preserved. Word ceiling `≤900 / 1400` preserved with compression order (CRITICAL CONTEXT + STATUS first; never ARTIFACTS or NEXT BEST ACTION) |
+| 8 | CLAUDE.md Rule Compliance | **1** | Filename convention `YYYY_MM_DD_<topic>_handoff_v<N>.md` matches `YYYY_MM_DD_short_description.ext` rule. Canonical path under `carucci_r`. Removed CLAUDE.md duplication is **improvement** — next session loads CLAUDE.md automatically |
+| 9 | Integration / Cross-Skill Safety | **1** | `grep -rln "00_dev/handoffs" skills/` returns empty — no other global skill writes to handoffs/. Versioned filename prevents collision across re-runs. Skill scoped to its own subdirectory; will not collide with chunk-chat (`KB_Shared/04_output/`) or any other writer |
 
 **Total: 9 / 9 — PASS**
 
@@ -32,60 +46,63 @@
 ### T1 — Static parse
 
 ```text
-YAML keys: ['name', 'description', 'agents']
+$ wc -l skills/session-handoff/SKILL.md
+170 skills/session-handoff/SKILL.md
+
+$ python -c "import yaml; print(list(yaml.safe_load(open('skills/session-handoff/SKILL.md').read().split('---')[1]).keys()))"
+['name', 'description', 'agents']
 name: session-handoff
 agents: ['main_agent', 'general_purpose']
-desc starts: Use when the user says 'handoff', 'continuity', 'next sessio
-body first H1: ['# Session handoff generator']
-badge count (#261): 2
-total lines: 142
 ```
 
-### T4 — Badge count proof
+### T3 — Path safety (post-fix)
 
-Exactly 2 occurrences of `#261`:
+```text
+$ grep -F "RobertCarucci" skills/session-handoff/SKILL.md
+(no output — PASS)
 
-1. Task header (line 9): `**R. A. Carucci (#261)**, Principal Analyst, SSOCC — Hackensack Police Department`
-2. Part 1 blockquote spec (line 38): `**Role:** R. A. Carucci (#261), Principal Analyst, SSOCC, Hackensack PD, NJ`
+$ grep -cF "carucci_r" skills/session-handoff/SKILL.md
+3
+```
 
-### T6 — Nil-state clauses verified
+In-pass fix: line 152 originally read `... carucci_r is a junction to RobertCarucci ...` (forbidden substring per CLAUDE.md). Replaced with neutral phrasing: `carucci_r is a junction to the real user profile`.
 
-- Line 39: `` `Active domains: none mentioned this session.` ``
-- Line 40: `` `Tech stack: none mentioned this session.` ``
-- Line 82: `If no options were rejected this session, write exactly: "No rejected options this session."`
-- Line 93: `If no artifacts were produced or touched this session, write a single line: 'No artifacts this session.'`
-- Line 142: `If the conversation was trivial or empty, say so in **PROJECT / TASK** in one line and omit other sections`
+### T9 — Cross-skill collision check
 
-### T8 — Behavioral directive match against CLAUDE.md
+```text
+$ grep -rln "00_dev/handoffs\|00_dev\\\\handoffs" skills/
+(no output — only session-handoff writes to that path)
+```
 
-| CLAUDE.md rule | skill SKILL.md | Match |
-|---|---|---|
-| "Short and direct. Lead with the answer or action." | `Output-first. No preamble or summary before the main answer.` | ✓ |
-| "Produce ready-to-run scripts. No pseudocode, no theory-only responses." | `No theory-first responses. No pseudocode unless explicitly requested.` | ✓ |
-| "Act as a rigorous, honest mentor. Do not default to agreement." | `Act as a rigorous, honest mentor. Challenge flawed assumptions. Do not default to agreement.` | ✓ |
+### Junction verification
+
+```text
+$ ls -la /c/Users/carucci_r
+lrwxrwxrwx ... /c/Users/carucci_r -> /c/Users/RobertCarucci
+```
+
+Confirms the canonical path resolves on this host (laptop). Desktop is the real profile, no junction — also resolves.
 
 ---
 
 ## Iteration History
 
-| Pass | Action | Outcome |
-|---|---|---|
-| 1 | Initial authoring via Write tool | File created at 5,111 bytes / 126 lines |
-| 2 | Applied 8-fix patch (badge, trigger description, SESSION METADATA, NEXT BEST ACTION single-item, H2 heading clarification, ARTIFACTS nil, word ceiling, CRITICAL CONTEXT categories) | Structural hardening; still 9/9 compatible |
-| 3 | Applied 3-fix patch (handoff version default, Rejected nil-state + label cleanup, `agents` frontmatter key) | Final version; 142 lines, 3 frontmatter keys |
-| 4 | `/qa-skill-hardening` pass | 9/9 PASS |
+| Pass | Date | Action | Outcome |
+|------|------|--------|---------|
+| 1 | 2026-04-19 | Initial authoring + 8-fix patch + 3-fix patch + first hardening | 9/9 PASS (read-only era) |
+| 2 | 2026-04-22 | 5 design enhancements (Pre-flight, strip CLAUDE.md duplication, SESSION METADATA defaults + Supersedes, ARTIFACTS anti-inference, Persistence) — committed in `47f93aa` | Triggered re-hardening |
+| 3 | 2026-04-22 | This pass: T3 forbidden-substring fix + R4 retirement + R8–R12 added | 9/9 PASS (write-capable era) |
 
 ---
 
-## Minor Style Smells (not FAIL-worthy)
+## Regression Test Disposition
 
-1. **Embedded H2 in instructions** (SKILL.md line 33): The literal template `## OPENING PROMPT — PASTE AS FIRST MESSAGE` appears as an H2 in the SKILL.md Markdown tree, not just as inline text. Rendered TOCs will show it as a duplicate section. Functional for Claude at read time — ignored by skills harness, which parses frontmatter + prose only.
-2. **Rejected nil-state without blank line** (SKILL.md lines 81–82): The `If no options were rejected this session…` instruction directly follows the example bullet. GFM will render it as bullet continuation rather than a standalone rule. Cosmetic.
-
-Both were intentional at the user's direction. Not blockers. Not fixed in this pass.
+- **R4 (verbatim 7-directive block)** — **RETIRED**. The directives duplicated CLAUDE.md and the user explicitly removed them this pass. Replaced with **R4-v2** (no CLAUDE.md restatement; session-specific deviations clause present).
+- **R1, R2, R3, R5, R6, R7** — all still PASS, no edits required.
+- **R8–R12** — added this pass to lock in new design (see `REGRESSION_TESTS.md`).
 
 ---
 
 ## Status
 
-**PASS — 9/9.** Promoted to Phase 7 documentation sync.
+**PASS — 9/9.** Eligible for Phase 7 documentation sync.

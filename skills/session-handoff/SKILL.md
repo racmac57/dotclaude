@@ -149,7 +149,7 @@ After drafting, **save the handoff to disk and display it in chat**. Both — th
 
 1. **Path** — canonical OneDrive root, always under `carucci_r`:
    `C:\Users\carucci_r\OneDrive - City of Hackensack\00_dev\handoffs\`
-   On the laptop, `carucci_r` is a junction to `RobertCarucci`; Windows resolves transparently — write to the `carucci_r` path on every host. Create the `handoffs/` subdirectory if missing. Do **not** save outside this directory without asking.
+   On the laptop, `carucci_r` is a junction to the real user profile; Windows resolves transparently. Always write to the `carucci_r` path on every host — never substitute the underlying profile name. Create the `handoffs/` subdirectory if missing. Do **not** save outside this directory without asking.
 2. **Filename** — `YYYY_MM_DD_<short-topic>_handoff_v<N>.md` where `<N>` matches `Handoff version`. Example: `2026_04_22_cad_etl_resume_handoff_v2.md`. Topic is 1–4 words, lowercase, underscores.
 3. **Content** — exact same Markdown shown in chat (both Part 1 and Part 2). No divergence between displayed and saved versions.
 4. **After saving**, append a single line below the displayed document:
