@@ -36,7 +36,7 @@ scripts/
 # Mirror-ToPersonalOneDrive.ps1 and future cross-machine scripts.
 !Scripts/
 tasks/
-.claude.code-workspace
+*.code-workspace
 policy-limits.json
 
 # OS

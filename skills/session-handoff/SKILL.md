@@ -19,9 +19,25 @@ The next session pastes the **whole document** as its first message.
 
 ---
 
-## Conflict resolution rule (run first)
+## Pre-flight (run before drafting)
 
-Before writing anything, scan the conversation for **contradictory instructions** or **position changes**. When two versions exist, use the **latest** stated position. **Never** silently reconcile: flag lingering contradictions under **OPEN QUESTIONS** with ⚠️. Pay extra attention to **early constraints** that were **walked back later**.
+Collect inputs in this order:
+
+1. **Prior handoff in this conversation?** Scan for an existing handoff (look for `## OPENING PROMPT — PASTE AS FIRST MESSAGE` or a `Handoff version: N` line). If one exists:
+   - Bump `Handoff version` to N+1 and populate `Supersedes:` with the prior file name if known.
+   - Cover **only the delta since the prior version** — new completions, new decisions, new artifacts, new blockers. Do **not** regenerate unchanged context; reference it in one line ("Prior context unchanged from v1").
+2. **Repo state?** If this session touched a git repository (the user ran `git`, you used Edit/Write on tracked files, or the working directory is a repo), capture via Bash:
+   - `git -C <repo-root> rev-parse --abbrev-ref HEAD` — current branch
+   - `git -C <repo-root> log --oneline -5` — recent commits
+   - `git -C <repo-root> status --short` — uncommitted / untracked
+   Surface under **ENVIRONMENT SNAPSHOT → Git state**. If not a repo, skip silently.
+3. **Date resolution.** Use today's date from CLAUDE.md context (or system date) to populate `Generated:` and the saved file name. Convert relative dates in the conversation ("yesterday", "Thursday") to absolute ISO dates before writing.
+
+---
+
+## Conflict resolution rule (after pre-flight)
+
+Scan the conversation for **contradictory instructions** or **position changes**. When two versions exist, use the **latest** stated position. **Never** silently reconcile: flag lingering contradictions under **OPEN QUESTIONS** with ⚠️. Pay extra attention to **early constraints** that were **walked back later**.
 
 ---
 
@@ -39,15 +55,9 @@ Inside the blockquote, include:
 - **Active domains:** only what appears **in this conversation** (e.g. CAD, RMS, Python ETL, GIS, Power BI, NIBRS, Clery, ALPR, CompStat). If none were discussed, write exactly: `Active domains: none mentioned this session.`  
 - **Tech stack:** only languages, tools, libraries, paths, DB names, report names **explicitly mentioned in this conversation**. If none were mentioned, write exactly: `Tech stack: none mentioned this session.` Do **not** infer defaults from CLAUDE.md, the repo, or general knowledge unless the user pasted that material into **this** chat.  
 - **Audience:** if the next session will write for **command staff**, say so (verbosity/formality). If unknown, say so in one short line.  
-- **Behavioral directives** (include **verbatim**):
+- **Session-specific deviations** — list **only** behavioral directives that **differed from CLAUDE.md defaults this session**. Examples: "user wanted longer prose for command-staff memo", "pseudocode-first for teaching context", "no git commits without explicit confirmation". If no deviations occurred, write exactly: `Session-specific deviations: none — follow CLAUDE.md defaults.`
 
-  - Output-first. No preamble or summary before the main answer.  
-  - If asked for code, give code first.  
-  - Fix code first; add a short note only if necessary.  
-  - No filler, no motivational language, no generic best practices.  
-  - No theory-first responses. No pseudocode unless explicitly requested.  
-  - Prefer complete scripts over fragments when enough context exists.  
-  - Act as a rigorous, honest mentor. Challenge flawed assumptions. Do not default to agreement.
+  Do **not** restate CLAUDE.md defaults (output-first, mentor approach, no filler, no theory-first, etc.). The next session loads CLAUDE.md automatically; restating them is noise that dilutes the real signal.
 
 ---
 
@@ -61,8 +71,9 @@ One line: what this session was about.
 
 ### SESSION METADATA
 
-- Generated: [ISO 8601 datetime if known, otherwise write: not available]
-- Handoff version: 1  ← start here; increment only if a prior handoff appears earlier in this conversation
+- Generated: [ISO 8601 datetime — use today's date from context; write `not available` only if truly unknown]
+- Handoff version: 1  ← start here; increment if a prior handoff appears earlier in this conversation (see Pre-flight step 1)
+- Supersedes: `<filename of prior handoff if known>`  ← omit line entirely on v1
 
 Include this section unconditionally — it is never omitted.
 
@@ -83,7 +94,7 @@ If no options were rejected this session, write exactly: "No rejected options th
 
 ### ARTIFACTS
 
-Every file, script, query, schema, config, report, or layer **touched or produced**. Per item:
+List **only** files, scripts, queries, schemas, configs, reports, or layers explicitly created, modified, or referenced by name/path **in this conversation**. Do **not** infer artifacts from CLAUDE.md, repo structure, or general knowledge — match the same anti-inference rule used for tech stack. Per item:
 
 - Name + extension  
 - Path or destination if stated  
@@ -129,6 +140,23 @@ Before finalizing, scan for:
 - Internal hosts/IPs → `[REVIEW BEFORE SHARING]`  
 
 Flag rather than silently delete when the next session must know something existed.
+
+---
+
+## Persistence
+
+After drafting, **save the handoff to disk and display it in chat**. Both — the chat copy is for immediate paste; the saved copy is the archival chain.
+
+1. **Path** — canonical OneDrive root, always under `carucci_r`:
+   `C:\Users\carucci_r\OneDrive - City of Hackensack\00_dev\handoffs\`
+   On the laptop, `carucci_r` is a junction to `RobertCarucci`; Windows resolves transparently — write to the `carucci_r` path on every host. Create the `handoffs/` subdirectory if missing. Do **not** save outside this directory without asking.
+2. **Filename** — `YYYY_MM_DD_<short-topic>_handoff_v<N>.md` where `<N>` matches `Handoff version`. Example: `2026_04_22_cad_etl_resume_handoff_v2.md`. Topic is 1–4 words, lowercase, underscores.
+3. **Content** — exact same Markdown shown in chat (both Part 1 and Part 2). No divergence between displayed and saved versions.
+4. **After saving**, append a single line below the displayed document:
+   `Saved: <full path>`
+   so the user sees where it landed without scrolling or re-asking.
+
+If write fails (path missing, permission denied), surface the error and fall back to chat-only with a `Save failed: <reason>` line — never silently drop the archival copy.
 
 ---
 
